@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent { label 'ahmad-paylabs' }
 
     environment {
         GIT_SSL_NO_VERIFY = 'true'
