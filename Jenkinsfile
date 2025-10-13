@@ -2,7 +2,9 @@ pipeline {
     agent { label 'ahmad-paylabs' }
 
     environment {
-        GIT_SSL_NO_VERIFY = 'true'
+        IMAGE_NAME = "paylabs-signature-playground"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        COMPOSE_PATH = "docker/docker-compose.yml"
     }
 
     stages {
@@ -14,31 +16,34 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Build Image (Self-signed HTTPS)') {
             steps {
-                echo 'Building application...'
-                sh 'docker build -t paylabs-signature-playground .'
+                echo "🔧 Building secure Nginx image..."
+                sh """
+                    podman build -f docker/Dockerfile -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                """
             }
         }
 
         stage('Deploy') {
             steps {
-                echo 'Deploying to Podman...'
-                sh '''
-                podman stop paylabs-signature-playground || true
-                podman rm paylabs-signature-playground || true
-                podman run -d --name paylabs-signature-playground -p 8080:80 paylabs-signature-playground
-                '''
+                echo "🚀 Deploying container with HTTPS..."
+                dir('docker') {
+                    sh """
+                        podman-compose down || true
+                        podman-compose -f ${COMPOSE_PATH} up -d
+                    """
+                }
             }
         }
     }
 
     post {
         success {
-            echo '✅ Deployment complete.'
+            echo "✅ HTTPS deployed at https://sign.play"
         }
         failure {
-            echo '❌ Build failed.'
+            echo "❌ Build failed — check Podman logs."
         }
     }
 }
