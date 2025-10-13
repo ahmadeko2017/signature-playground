@@ -1,0 +1,104 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()                     // Tambahkan timestamp ke log build
+        buildDiscarder(logRotator(numToKeepStr: '10'))  // Hapus build lama
+        disableConcurrentBuilds()         // Hindari race condition
+        ansiColor('xterm')                // Warna log terminal lebih jelas
+    }
+
+    environment {
+        APP_NAME = "signature-playground"
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+        CONTAINER_NAME = "signature-playground"
+        REGISTRY = "registry.local"
+        REGISTRY_CREDENTIALS = "registry-cred"
+        DEPLOY_PORT = "8443"
+    }
+
+    stages {
+        stage('Checkout Source') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Static Analysis') {
+            steps {
+                echo "Running lint checks..."
+                sh 'npm ci && npm run lint'
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                script {
+                    sh """
+                        podman build \
+                          -t ${REGISTRY}/${APP_NAME}:${IMAGE_TAG} \
+                          -t ${REGISTRY}/${APP_NAME}:latest .
+                    """
+                }
+            }
+        }
+
+        stage('Security Scan') {
+            steps {
+                script {
+                    echo "Running container scan..."
+                    sh "trivy image ${REGISTRY}/${APP_NAME}:${IMAGE_TAG} || true"
+                }
+            }
+        }
+
+        stage('Push to Registry') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: "${REGISTRY_CREDENTIALS}", passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                    sh """
+                        podman login ${REGISTRY} -u ${USER} -p ${PASS}
+                        podman push ${REGISTRY}/${APP_NAME}:${IMAGE_TAG}
+                        podman push ${REGISTRY}/${APP_NAME}:latest
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to Podman Host') {
+            steps {
+                script {
+                    // Jalankan Podman di host target (local atau remote)
+                    sh """
+                        podman stop ${CONTAINER_NAME} || true
+                        podman rm ${CONTAINER_NAME} || true
+                        podman run -d \
+                          --name ${CONTAINER_NAME} \
+                          -p ${DEPLOY_PORT}:443 \
+                          -e NODE_ENV=production \
+                          ${REGISTRY}/${APP_NAME}:latest
+                    """
+                }
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                sh """
+                    curl -vk https://localhost:${DEPLOY_PORT} || true
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Build and deployment completed successfully"
+        }
+        failure {
+            echo "❌ Build or deployment failed. Check logs."
+        }
+        always {
+            cleanWs()
+        }
+    }
+}
