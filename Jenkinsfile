@@ -40,6 +40,16 @@ pipeline {
             }
         }
 
+        stage('Build Frontend') {
+            steps {
+                echo "🧱 Building frontend (Vite React)..."
+                sh '''
+                    npm ci
+                    npm run build
+                '''
+            }
+        }
+
         stage('Build Nginx Image (HTTPS Only)') {
             steps {
                 echo "🔧 Building Podman image..."
