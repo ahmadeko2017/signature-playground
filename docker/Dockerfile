@@ -1,52 +1,24 @@
-# =============================================
-# === STAGE 1: Build React App (Vite + Node) ==
-# =============================================
-FROM node:20.11.1-alpine3.19 AS builder
+FROM nginx:1.27-alpine
 
-LABEL maintainer="Ahmad Eko Kurniawan <ahmad@example.com>" \
-      description="Signature Playground v6 build image (React + Vite)" \
-      stage="builder"
+# Install OpenSSL untuk generate sertifikat self-signed
+RUN apk add --no-cache openssl
 
-# Set working directory
-WORKDIR /app
+# Buat folder sertifikat dan generate self-signed cert saat build
+RUN mkdir -p /etc/nginx/certs && \
+    openssl req -x509 -newkey rsa:2048 -nodes \
+      -keyout /etc/nginx/certs/sign.play-key.pem \
+      -out /etc/nginx/certs/sign.play.pem \
+      -subj "/CN=sign.play" \
+      -addext "subjectAltName=DNS:sign.play,IP:127.0.0.1" \
+      -days 365
 
-# Optimize cache: copy only package definition first
-COPY package*.json ./
+# Copy konfigurasi nginx custom
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Install dependencies (production only)
-RUN npm ci --omit=dev
+# Salin file web statis
+COPY ./dist /usr/share/nginx/html
 
-# Copy all source code (filtered via .dockerignore)
-COPY . .
-
-# Build production-ready static files
-RUN npm run build
-
-
-# ==========================================
-# === STAGE 2: Hardened Nginx Runtime ======
-# ==========================================
-FROM nginx:1.27.1-alpine3.19 AS runtime
-
-LABEL maintainer="Ahmad Eko Kurniawan <ahmad@example.com>" \
-      description="Signature Playground v6 runtime (Nginx static HTTPS)"
-
-# Fallback: create non-root user safely if not exists
-RUN addgroup -S appgroup && adduser -S -G appgroup -u 1001 appuser \
-    && mkdir -p /usr/share/nginx/html /etc/nginx/certs /var/cache/nginx \
-    && chown -R appuser:appgroup /usr/share/nginx/html /etc/nginx /var/cache/nginx
-
-# Copy Nginx config
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copy build output from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Switch to non-root user
-USER appuser
-
-# Expose only HTTPS port
 EXPOSE 443
+EXPOSE 80
 
-# Run Nginx in foreground mode
 CMD ["nginx", "-g", "daemon off;"]
