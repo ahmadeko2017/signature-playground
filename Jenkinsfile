@@ -9,7 +9,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main',
-                    credentialsId: 'ahmad-gitlab',
+                    credentialsId: '9debc1d7-403d-49cf-8d6e-693cc0917a7e',
                     url: 'https://gitlab.local/paylabs/api-improvement/signature-playgroung.git'
             }
         }
