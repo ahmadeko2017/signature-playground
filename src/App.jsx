@@ -412,7 +412,7 @@ export default function SignaturePlaygroundV6() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <h1 className="font-bold text-2xl text-white">
-              Signature Playground v6
+              Signature Playground
             </h1>
             <p className="text-sm text-white/90">
               RSA PKCS#1 v1.5 + SHA-256 • Live canonical preview • PKCS#1/PKCS#8
