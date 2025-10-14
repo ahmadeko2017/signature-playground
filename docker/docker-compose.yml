@@ -1,60 +1,12 @@
-version: "3.9"
+version: '3.8'
 
 services:
-  signature-playground:
+  signature:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: signature-playground:v1.0.1
+    image: paylabs-signature-playground:${BUILD_NUMBER}
     container_name: signature-playground
-
-    # Port binding hanya HTTPS
     ports:
       - "443:443"
-
-    # Mount cert volume read-only
-    volumes:
-      - ../certs:/etc/nginx/certs:ro
-
-    # Non-root user sudah ditetapkan di Dockerfile (appuser)
-    user: "1001:1001"
-
-    # Restart policy aman
-    restart: unless-stopped
-
-    # Resource limits untuk keamanan & stabilitas
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 512M
-        reservations:
-          memory: 128M
-
-    # Network isolation
-    networks:
-      - webnet
-
-    # Security options
-    security_opt:
-      - no-new-privileges:true # Cegah privilege escalation
-      - label:disable # Nonaktifkan label SELinux jika tidak digunakan
-
-    # Read-only filesystem untuk mencegah modifikasi di runtime
-    read_only: true
-
-    # Restrict tmpfs (temporary filesystem) agar hanya di lokasi aman
-    tmpfs:
-      - /var/cache/nginx
-      - /tmp:rw,noexec,nosuid,size=64m
-
-    # Environment minimal
-    environment:
-      - NODE_ENV=production
-      - TZ=Asia/Jakarta
-
-networks:
-  webnet:
-    driver: bridge
-    driver_opts:
-      com.docker.network.bridge.name: br-webnet
+    restart: always
